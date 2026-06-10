@@ -1,0 +1,8 @@
+{
+  "stocks": [
+    {
+      "ticker": "QQQM",
+      "alerts": [10, 15, 20]
+    }
+  ]
+}
