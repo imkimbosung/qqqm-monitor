@@ -34,7 +34,7 @@ def get_current_price(ticker):
 
 def get_all_time_high(ticker):
     hist = yf.Ticker(ticker).history(period="max", auto_adjust=True)
-    return float(hist["Close"].max())
+    return float(hist["High"].max())
 
 
 def monitor():
