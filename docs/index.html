@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QQQM Monitor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>📉 QQQM Monitor</h1>
+      <div class="subtitle">신고점 대비 하락 알림 대시보드</div>
+    </div>
+  </header>
+
+  <div id="summary" class="cards"></div>
+
+  <div class="section-title">체크 이력</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>날짜</th>
+          <th>종목</th>
+          <th>현재가</th>
+          <th>하락률</th>
+          <th>알림</th>
+        </tr>
+      </thead>
+      <tbody id="history-body"></tbody>
+    </table>
+  </div>
+
+  <div id="last-updated" class="last-updated"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

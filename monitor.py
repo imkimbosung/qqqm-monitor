@@ -3,9 +3,11 @@ import os
 import sys
 import requests
 import yfinance as yf
+from datetime import datetime, timezone
 
 CONFIG_FILE = "config.json"
 RECORD_FILE = "high_record.json"
+HISTORY_FILE = "docs/history.json"
 
 
 def load_json(path, default):
@@ -43,6 +45,7 @@ def monitor():
 
     config = load_json(CONFIG_FILE, {"stocks": []})
     records = load_json(RECORD_FILE, {})
+    run_log = []
 
     for stock in config["stocks"]:
         ticker = stock["ticker"]
@@ -53,7 +56,6 @@ def monitor():
 
         rec = records.get(ticker, {"all_time_high": 0.0, "fired_alerts": []})
 
-        # Update ATH: use max of stored value, historical max, and current price
         new_ath = max(rec["all_time_high"], ath_from_history, current)
         if new_ath > rec["all_time_high"]:
             rec["all_time_high"] = new_ath
@@ -75,8 +77,22 @@ def monitor():
             rec["fired_alerts"].extend(to_fire)
 
         records[ticker] = rec
+        run_log.append({
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "ticker": ticker,
+            "current": round(current, 2),
+            "ath": round(ath, 2),
+            "drop_pct": round(drop_pct, 2),
+            "alert_sent": max(to_fire) if to_fire else None
+        })
 
     save_json(RECORD_FILE, records)
+
+    os.makedirs("docs", exist_ok=True)
+    history = load_json(HISTORY_FILE, [])
+    for entry in run_log:
+        history.insert(0, entry)
+    save_json(HISTORY_FILE, history[:90])
 
 
 if __name__ == "__main__":
