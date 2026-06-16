@@ -1,3 +1,28 @@
+// Auth
+function showApp() {
+  document.getElementById('auth-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  App.init();
+}
+
+function showAuthGate() {
+  document.getElementById('auth-gate').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+netlifyIdentity.on('init', user => { user ? showApp() : showAuthGate(); });
+netlifyIdentity.on('login', () => { netlifyIdentity.close(); showApp(); });
+netlifyIdentity.on('logout', showAuthGate);
+
+document.getElementById('login-btn').addEventListener('click', () => {
+  netlifyIdentity.open('login');
+});
+
+document.getElementById('logout-btn').addEventListener('click', () => {
+  netlifyIdentity.logout();
+});
+
+// Dashboard
 const App = {
   async init() {
     try {
@@ -80,5 +105,3 @@ const App = {
   // editStock(ticker, alerts) { ... }
   // deleteStock(ticker) { ... }
 };
-
-App.init();

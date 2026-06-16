@@ -4,35 +4,50 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QQQM Monitor</title>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <div>
-      <h1>📉 QQQM Monitor</h1>
-      <div class="subtitle">신고점 대비 하락 알림 대시보드</div>
+  <!-- 로그인 전: 인증 화면 -->
+  <div id="auth-gate">
+    <div class="auth-box">
+      <div class="auth-logo">📉</div>
+      <h1>QQQM Monitor</h1>
+      <p>계속하려면 로그인하세요</p>
+      <button id="login-btn">로그인</button>
     </div>
-  </header>
-
-  <div id="summary" class="cards"></div>
-
-  <div class="section-title">체크 이력</div>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>날짜</th>
-          <th>종목</th>
-          <th>현재가</th>
-          <th>하락률</th>
-          <th>알림</th>
-        </tr>
-      </thead>
-      <tbody id="history-body"></tbody>
-    </table>
   </div>
 
-  <div id="last-updated" class="last-updated"></div>
+  <!-- 로그인 후: 대시보드 -->
+  <div id="app" style="display:none">
+    <header>
+      <div>
+        <h1>📉 QQQM Monitor</h1>
+        <div class="subtitle">신고점 대비 하락 알림 대시보드</div>
+      </div>
+      <button id="logout-btn">로그아웃</button>
+    </header>
+
+    <div id="summary" class="cards"></div>
+
+    <div class="section-title">체크 이력</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>날짜</th>
+            <th>종목</th>
+            <th>현재가</th>
+            <th>하락률</th>
+            <th>알림</th>
+          </tr>
+        </thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+
+    <div id="last-updated" class="last-updated"></div>
+  </div>
 
   <script src="app.js"></script>
 </body>
