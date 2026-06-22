@@ -4,6 +4,7 @@ import sys
 import requests
 import yfinance as yf
 from datetime import datetime, timezone
+from supabase import create_client
 
 CONFIG_FILE = "config.json"
 RECORD_FILE = "high_record.json"
@@ -99,6 +100,22 @@ def monitor():
     for entry in run_log:
         history.insert(0, entry)
     save_json(HISTORY_FILE, history[:90])
+
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if supabase_url and supabase_key:
+        sb = create_client(supabase_url, supabase_key)
+        for entry in run_log:
+            sb.table("monitor_history").insert({
+                "date": entry["date"],
+                "ticker": entry["ticker"],
+                "current_price": entry["current"],
+                "ath": entry["ath"],
+                "drop_pct": entry["drop_pct"],
+                "alert_sent": entry["alert_sent"],
+                "vix": entry["vix"],
+            }).execute()
+        print(f"Supabase: inserted {len(run_log)} row(s)")
 
 
 if __name__ == "__main__":

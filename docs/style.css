@@ -213,3 +213,54 @@ tbody td {
   margin-top: 16px;
   text-align: right;
 }
+
+/* VIX gauge */
+.gauge-wrap {
+  margin-top: 10px;
+}
+
+.gauge-bar {
+  height: 6px;
+  background: #2d3348;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.gauge-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.gauge-fill.safe   { background: #4ade80; }
+.gauge-fill.warn   { background: #facc15; }
+.gauge-fill.alert  { background: #fb923c; }
+.gauge-fill.danger { background: #f87171; }
+
+.gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: #475569;
+}
+
+/* Mini gauge for table */
+.mini-gauge {
+  width: 48px;
+  height: 3px;
+  background: #2d3348;
+  border-radius: 999px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.mini-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.mini-fill.safe   { background: #4ade80; }
+.mini-fill.warn   { background: #facc15; }
+.mini-fill.alert  { background: #fb923c; }
+.mini-fill.danger { background: #f87171; }

@@ -1,3 +1,6 @@
+const SUPABASE_URL  = 'https://tsbuquzmdnwyebbqqnao.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRzYnVxdXptZG53eWViYnFxbmFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIwOTA0NjgsImV4cCI6MjA5NzY2NjQ2OH0.hnjkdPfKc6pBAWGQwRndZXYzB4yQGdtWjXVnrUtk4C8';
+
 // Auth
 function showApp() {
   document.getElementById('auth-gate').style.display = 'none';
@@ -26,12 +29,24 @@ document.getElementById('logout-btn').addEventListener('click', () => {
 const App = {
   async init() {
     try {
-      const res = await fetch('history.json');
-      const data = await res.json();
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/monitor_history?order=date.desc,id.desc&limit=90`,
+        { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
+      );
+      const rows = await res.json();
+      const data = rows.map(r => ({
+        date:       r.date,
+        ticker:     r.ticker,
+        current:    r.current_price,
+        ath:        r.ath,
+        drop_pct:   r.drop_pct,
+        alert_sent: r.alert_sent,
+        vix:        r.vix,
+      }));
       this.renderSummary(data);
       this.renderTable(data);
       this.renderLastUpdated(data);
-    } catch {
+    } catch (e) {
       document.getElementById('summary').innerHTML =
         '<p class="empty">데이터를 불러올 수 없습니다.</p>';
     }
@@ -58,6 +73,22 @@ const App = {
     return '안정';
   },
 
+  renderVixGauge(v) {
+    if (v == null) return '<span style="color:#475569">—</span>';
+    const pct = Math.min(v / 50 * 100, 100).toFixed(1);
+    const cls = this.vixClass(v);
+    return `
+      <div class="gauge-wrap">
+        <div class="gauge-bar">
+          <div class="gauge-fill ${cls}" style="width:${pct}%"></div>
+        </div>
+        <div class="gauge-labels">
+          <span>안정</span><span>보통</span><span>공포</span><span>극도</span>
+        </div>
+      </div>
+    `;
+  },
+
   renderSummary(data) {
     const el = document.getElementById('summary');
     if (!data.length) {
@@ -65,29 +96,30 @@ const App = {
       return;
     }
     const latest = data[0];
-    const cls = this.dropClass(latest.drop_pct);
+    const cls  = this.dropClass(latest.drop_pct);
     const vCls = latest.vix != null ? this.vixClass(latest.vix) : '';
     const vLbl = latest.vix != null ? this.vixLabel(latest.vix) : '—';
     el.innerHTML = `
       <div class="card">
         <div class="label">현재가</div>
-        <div class="value">$${latest.current.toFixed(2)}</div>
+        <div class="value">$${Number(latest.current).toFixed(2)}</div>
         <div class="meta">${latest.ticker} · ${latest.date}</div>
       </div>
       <div class="card">
         <div class="label">역대 신고점</div>
-        <div class="value">$${latest.ath.toFixed(2)}</div>
+        <div class="value">$${Number(latest.ath).toFixed(2)}</div>
         <div class="meta">수정주가 기준</div>
       </div>
       <div class="card">
         <div class="label">신고점 대비 하락률</div>
-        <div class="value ${cls}">-${latest.drop_pct.toFixed(2)}%</div>
+        <div class="value ${cls}">-${Number(latest.drop_pct).toFixed(2)}%</div>
         <div class="meta">${latest.alert_sent ? `⚠️ ${latest.alert_sent}% 알림 발송` : '알림 없음'}</div>
       </div>
       <div class="card">
         <div class="label">VIX 공포지수</div>
-        <div class="value ${vCls}">${latest.vix?.toFixed(1) ?? '—'}</div>
+        <div class="value ${vCls}">${latest.vix != null ? Number(latest.vix).toFixed(1) : '—'}</div>
         <div class="meta">${vLbl}</div>
+        ${latest.vix != null ? this.renderVixGauge(latest.vix) : ''}
       </div>
     `;
   },
@@ -99,18 +131,23 @@ const App = {
       return;
     }
     tbody.innerHTML = data.map(row => {
-      const cls = this.dropClass(row.drop_pct);
+      const cls  = this.dropClass(row.drop_pct);
       const vCls = row.vix != null ? this.vixClass(row.vix) : '';
       const alertCell = row.alert_sent
         ? `<span class="badge">${row.alert_sent}% 발송</span>`
         : '<span style="color:#475569">—</span>';
+      const vixCell = row.vix != null ? `
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="${vCls}">${Number(row.vix).toFixed(1)}</span>
+          <div class="mini-gauge"><div class="mini-fill ${vCls}" style="width:${Math.min(row.vix/50*100,100).toFixed(0)}%"></div></div>
+        </div>` : '<span style="color:#475569">—</span>';
       return `
         <tr class="${row.alert_sent ? 'alerted' : ''}">
           <td>${row.date}</td>
           <td>${row.ticker}</td>
-          <td>$${row.current.toFixed(2)}</td>
-          <td class="${cls}">-${row.drop_pct.toFixed(2)}%</td>
-          <td class="${vCls}">${row.vix?.toFixed(1) ?? '—'}</td>
+          <td>$${Number(row.current).toFixed(2)}</td>
+          <td class="${cls}">-${Number(row.drop_pct).toFixed(2)}%</td>
+          <td>${vixCell}</td>
           <td>${alertCell}</td>
         </tr>
       `;
