@@ -37,6 +37,10 @@ def get_all_time_high(ticker):
     return float(hist["High"].max())
 
 
+def get_vix():
+    return round(float(yf.Ticker("^VIX").fast_info["last_price"]), 2)
+
+
 def monitor():
     webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
     if not webhook_url:
@@ -46,6 +50,7 @@ def monitor():
     config = load_json(CONFIG_FILE, {"stocks": []})
     records = load_json(RECORD_FILE, {})
     run_log = []
+    vix = get_vix()
 
     for stock in config["stocks"]:
         ticker = stock["ticker"]
@@ -83,7 +88,8 @@ def monitor():
             "current": round(current, 2),
             "ath": round(ath, 2),
             "drop_pct": round(drop_pct, 2),
-            "alert_sent": max(to_fire) if to_fire else None
+            "alert_sent": max(to_fire) if to_fire else None,
+            "vix": vix
         })
 
     save_json(RECORD_FILE, records)

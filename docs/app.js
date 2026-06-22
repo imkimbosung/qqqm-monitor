@@ -44,6 +44,20 @@ const App = {
     return 'safe';
   },
 
+  vixClass(v) {
+    if (v >= 30) return 'danger';
+    if (v >= 20) return 'alert';
+    if (v >= 15) return 'warn';
+    return 'safe';
+  },
+
+  vixLabel(v) {
+    if (v >= 30) return '극도 공포';
+    if (v >= 20) return '공포';
+    if (v >= 15) return '보통';
+    return '안정';
+  },
+
   renderSummary(data) {
     const el = document.getElementById('summary');
     if (!data.length) {
@@ -52,6 +66,8 @@ const App = {
     }
     const latest = data[0];
     const cls = this.dropClass(latest.drop_pct);
+    const vCls = latest.vix != null ? this.vixClass(latest.vix) : '';
+    const vLbl = latest.vix != null ? this.vixLabel(latest.vix) : '—';
     el.innerHTML = `
       <div class="card">
         <div class="label">현재가</div>
@@ -68,17 +84,23 @@ const App = {
         <div class="value ${cls}">-${latest.drop_pct.toFixed(2)}%</div>
         <div class="meta">${latest.alert_sent ? `⚠️ ${latest.alert_sent}% 알림 발송` : '알림 없음'}</div>
       </div>
+      <div class="card">
+        <div class="label">VIX 공포지수</div>
+        <div class="value ${vCls}">${latest.vix?.toFixed(1) ?? '—'}</div>
+        <div class="meta">${vLbl}</div>
+      </div>
     `;
   },
 
   renderTable(data) {
     const tbody = document.getElementById('history-body');
     if (!data.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty">기록 없음</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">기록 없음</td></tr>';
       return;
     }
     tbody.innerHTML = data.map(row => {
       const cls = this.dropClass(row.drop_pct);
+      const vCls = row.vix != null ? this.vixClass(row.vix) : '';
       const alertCell = row.alert_sent
         ? `<span class="badge">${row.alert_sent}% 발송</span>`
         : '<span style="color:#475569">—</span>';
@@ -88,6 +110,7 @@ const App = {
           <td>${row.ticker}</td>
           <td>$${row.current.toFixed(2)}</td>
           <td class="${cls}">-${row.drop_pct.toFixed(2)}%</td>
+          <td class="${vCls}">${row.vix?.toFixed(1) ?? '—'}</td>
           <td>${alertCell}</td>
         </tr>
       `;
