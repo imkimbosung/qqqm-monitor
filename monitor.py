@@ -33,9 +33,12 @@ def get_current_price(ticker):
     return info["last_price"]
 
 
-def get_all_time_high(ticker):
+def get_ticker_stats(ticker):
     hist = yf.Ticker(ticker).history(period="max", auto_adjust=True)
-    return float(hist["High"].max())
+    ath = float(hist["High"].max())
+    ma50  = round(float(hist["Close"].rolling(50).mean().iloc[-1]), 2)
+    ma200 = round(float(hist["Close"].rolling(200).mean().iloc[-1]), 2)
+    return ath, ma50, ma200
 
 
 def get_vix():
@@ -58,7 +61,7 @@ def monitor():
         thresholds = sorted(stock["alerts"])
 
         current = get_current_price(ticker)
-        ath_from_history = get_all_time_high(ticker)
+        ath_from_history, ma50, ma200 = get_ticker_stats(ticker)
 
         rec = records.get(ticker, {"all_time_high": 0.0, "fired_alerts": []})
 
@@ -90,7 +93,9 @@ def monitor():
             "ath": round(ath, 2),
             "drop_pct": round(drop_pct, 2),
             "alert_sent": max(to_fire) if to_fire else None,
-            "vix": vix
+            "vix": vix,
+            "ma50": ma50,
+            "ma200": ma200,
         })
 
     save_json(RECORD_FILE, records)
@@ -114,6 +119,8 @@ def monitor():
                 "drop_pct": entry["drop_pct"],
                 "alert_sent": entry["alert_sent"],
                 "vix": entry["vix"],
+                "ma50": entry["ma50"],
+                "ma200": entry["ma200"],
             }).execute()
         print(f"Supabase: inserted {len(run_log)} row(s)")
 

@@ -42,6 +42,8 @@ const App = {
         drop_pct:   r.drop_pct,
         alert_sent: r.alert_sent,
         vix:        r.vix,
+        ma50:       r.ma50,
+        ma200:      r.ma200,
       }));
       this.renderSummary(data);
       this.renderTable(data);
@@ -73,6 +75,33 @@ const App = {
     return '안정';
   },
 
+  maClass(pct) {
+    if (pct >= 5)  return 'safe';
+    if (pct >= 0)  return 'warn';
+    return 'danger';
+  },
+
+  renderThresholdBars(drop_pct) {
+    const thresholds = [10, 15, 20];
+    return `
+      <div class="threshold-bars">
+        ${thresholds.map(t => {
+          const filled = Math.min(drop_pct / t * 100, 100).toFixed(0);
+          const fired  = drop_pct >= t;
+          const remain = fired ? '발송됨' : `-${(t - drop_pct).toFixed(1)}% 남음`;
+          const cls    = t >= 20 ? 'danger' : t >= 15 ? 'alert' : 'warn';
+          return `
+            <div class="threshold-row">
+              <span class="threshold-label">${t}%</span>
+              <div class="gauge-bar threshold-gauge">
+                <div class="gauge-fill ${cls}" style="width:${filled}%"></div>
+              </div>
+              <span class="threshold-remain ${fired ? cls : ''}">${remain}</span>
+            </div>`;
+        }).join('')}
+      </div>`;
+  },
+
   renderVixGauge(v) {
     if (v == null) return '<span style="color:#475569">—</span>';
     const pct = Math.min(v / 50 * 100, 100).toFixed(1);
@@ -99,6 +128,11 @@ const App = {
     const cls  = this.dropClass(latest.drop_pct);
     const vCls = latest.vix != null ? this.vixClass(latest.vix) : '';
     const vLbl = latest.vix != null ? this.vixLabel(latest.vix) : '—';
+    const ma50pct  = latest.ma50  != null ? ((latest.current / latest.ma50  - 1) * 100) : null;
+    const ma200pct = latest.ma200 != null ? ((latest.current / latest.ma200 - 1) * 100) : null;
+    const ma50Cls  = ma50pct  != null ? this.maClass(ma50pct)  : '';
+    const ma200Cls = ma200pct != null ? this.maClass(ma200pct) : '';
+
     el.innerHTML = `
       <div class="card">
         <div class="label">현재가</div>
@@ -114,12 +148,23 @@ const App = {
         <div class="label">신고점 대비 하락률</div>
         <div class="value ${cls}">-${Number(latest.drop_pct).toFixed(2)}%</div>
         <div class="meta">${latest.alert_sent ? `⚠️ ${latest.alert_sent}% 알림 발송` : '알림 없음'}</div>
+        ${this.renderThresholdBars(latest.drop_pct)}
       </div>
       <div class="card">
         <div class="label">VIX 공포지수</div>
         <div class="value ${vCls}">${latest.vix != null ? Number(latest.vix).toFixed(1) : '—'}</div>
         <div class="meta">${vLbl}</div>
         ${latest.vix != null ? this.renderVixGauge(latest.vix) : ''}
+      </div>
+      <div class="card">
+        <div class="label">MA50 대비</div>
+        <div class="value ${ma50Cls}">${ma50pct != null ? (ma50pct >= 0 ? '+' : '') + ma50pct.toFixed(2) + '%' : '—'}</div>
+        <div class="meta">${latest.ma50 != null ? `$${Number(latest.ma50).toFixed(2)}` : '데이터 없음'}</div>
+      </div>
+      <div class="card">
+        <div class="label">MA200 대비</div>
+        <div class="value ${ma200Cls}">${ma200pct != null ? (ma200pct >= 0 ? '+' : '') + ma200pct.toFixed(2) + '%' : '—'}</div>
+        <div class="meta">${latest.ma200 != null ? `$${Number(latest.ma200).toFixed(2)}` : '데이터 없음'}</div>
       </div>
     `;
   },
@@ -141,6 +186,11 @@ const App = {
           <span class="${vCls}">${Number(row.vix).toFixed(1)}</span>
           <div class="mini-gauge"><div class="mini-fill ${vCls}" style="width:${Math.min(row.vix/50*100,100).toFixed(0)}%"></div></div>
         </div>` : '<span style="color:#475569">—</span>';
+      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
+      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
+      const fmtMa = pct => pct != null
+        ? `<span class="${this.maClass(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span>`
+        : '<span style="color:#475569">—</span>';
       return `
         <tr class="${row.alert_sent ? 'alerted' : ''}">
           <td>${row.date}</td>
@@ -148,6 +198,8 @@ const App = {
           <td>$${Number(row.current).toFixed(2)}</td>
           <td class="${cls}">-${Number(row.drop_pct).toFixed(2)}%</td>
           <td>${vixCell}</td>
+          <td>${fmtMa(ma50pct)}</td>
+          <td>${fmtMa(ma200pct)}</td>
           <td>${alertCell}</td>
         </tr>
       `;

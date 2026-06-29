@@ -245,6 +245,38 @@ tbody td {
   color: #475569;
 }
 
+/* Threshold progress bars */
+.threshold-bars {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.threshold-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  color: #94a3b8;
+}
+
+.threshold-label {
+  width: 28px;
+  flex-shrink: 0;
+}
+
+.threshold-gauge {
+  flex: 1;
+}
+
+.threshold-remain {
+  margin-left: auto;
+  white-space: nowrap;
+  min-width: 72px;
+  text-align: right;
+}
+
 /* Mini gauge for table */
 .mini-gauge {
   width: 48px;
