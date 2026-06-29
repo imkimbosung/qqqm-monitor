@@ -1,5 +1,16 @@
 [
   {
+    "date": "2026-06-29",
+    "ticker": "QQQM",
+    "current": 294.85,
+    "ath": 308.21,
+    "drop_pct": 4.33,
+    "alert_sent": null,
+    "vix": 18.27,
+    "ma50": 289.69,
+    "ma200": 259.91
+  },
+  {
     "date": "2026-06-28",
     "ticker": "QQQM",
     "current": 290.95,
