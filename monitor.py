@@ -7,31 +7,14 @@ from datetime import datetime, timezone
 from supabase import create_client
 
 CONFIG_FILE = "config.json"
-RECORD_FILE = "high_record.json"
-HISTORY_FILE = "docs/history.json"
-
-
-def load_json(path, default):
-    if os.path.exists(path):
-        with open(path, "r") as f:
-            return json.load(f)
-    return default
-
-
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
 
 def send_slack(webhook_url, message):
     resp = requests.post(webhook_url, json={"text": message}, timeout=10)
     resp.raise_for_status()
 
-
 def get_current_price(ticker):
     info = yf.Ticker(ticker).fast_info
     return info["last_price"]
-
 
 def get_ticker_stats(ticker):
     hist = yf.Ticker(ticker).history(period="max", auto_adjust=True)
@@ -40,10 +23,8 @@ def get_ticker_stats(ticker):
     ma200 = round(float(hist["Close"].rolling(200).mean().iloc[-1]), 2)
     return ath, ma50, ma200
 
-
 def get_vix():
     return round(float(yf.Ticker("^VIX").fast_info["last_price"]), 2)
-
 
 def monitor():
     webhook_url = os.environ.get("SLACK_WEBHOOK_URL")
@@ -51,8 +32,25 @@ def monitor():
         print("SLACK_WEBHOOK_URL not set", file=sys.stderr)
         sys.exit(1)
 
-    config = load_json(CONFIG_FILE, {"stocks": []})
-    records = load_json(RECORD_FILE, {})
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
+    if not supabase_url or not supabase_key:
+        print("SUPABASE_URL / SUPABASE_SERVICE_KEY not set", file=sys.stderr)
+        sys.exit(1)
+    sb = create_client(supabase_url, supabase_key)
+
+    with open(CONFIG_FILE) as f:
+        config = json.load(f)
+
+    state_rows = sb.table("monitor_state").select("*").execute().data
+    records = {
+        row["ticker"]: {
+            "all_time_high": float(row["all_time_high"]),
+            "fired_alerts": row["fired_alerts"] or [],
+        }
+        for row in state_rows
+    }
+
     run_log = []
     vix = get_vix()
 
@@ -85,7 +83,13 @@ def monitor():
             print(f"Sent alert: {highest}% for {ticker}")
             rec["fired_alerts"].extend(to_fire)
 
-        records[ticker] = rec
+        sb.table("monitor_state").upsert({
+            "ticker": ticker,
+            "all_time_high": rec["all_time_high"],
+            "fired_alerts": rec["fired_alerts"],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+
         run_log.append({
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "ticker": ticker,
@@ -98,32 +102,19 @@ def monitor():
             "ma200": ma200,
         })
 
-    save_json(RECORD_FILE, records)
-
-    os.makedirs("docs", exist_ok=True)
-    history = load_json(HISTORY_FILE, [])
     for entry in run_log:
-        history.insert(0, entry)
-    save_json(HISTORY_FILE, history[:90])
-
-    supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY")
-    if supabase_url and supabase_key:
-        sb = create_client(supabase_url, supabase_key)
-        for entry in run_log:
-            sb.table("monitor_history").insert({
-                "date": entry["date"],
-                "ticker": entry["ticker"],
-                "current_price": entry["current"],
-                "ath": entry["ath"],
-                "drop_pct": entry["drop_pct"],
-                "alert_sent": entry["alert_sent"],
-                "vix": entry["vix"],
-                "ma50": entry["ma50"],
-                "ma200": entry["ma200"],
-            }).execute()
-        print(f"Supabase: inserted {len(run_log)} row(s)")
-
+        sb.table("monitor_history").insert({
+            "date": entry["date"],
+            "ticker": entry["ticker"],
+            "current_price": entry["current"],
+            "ath": entry["ath"],
+            "drop_pct": entry["drop_pct"],
+            "alert_sent": entry["alert_sent"],
+            "vix": entry["vix"],
+            "ma50": entry["ma50"],
+            "ma200": entry["ma200"],
+        }).execute()
+    print(f"Supabase: inserted {len(run_log)} row(s)")
 
 if __name__ == "__main__":
     monitor()
