@@ -5,6 +5,7 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 function showApp() {
   document.getElementById('auth-gate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
+  Nav.init();
   App.init();
 }
 
@@ -24,6 +25,22 @@ document.getElementById('login-btn').addEventListener('click', () => {
 document.getElementById('logout-btn').addEventListener('click', () => {
   netlifyIdentity.logout();
 });
+
+// Navigation
+const Nav = {
+  init() {
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+      btn.addEventListener('click', () => this.navigate(btn.dataset.page));
+    });
+  },
+  navigate(page) {
+    document.querySelectorAll('.nav-tab').forEach(b =>
+      b.classList.toggle('active', b.dataset.page === page));
+    document.getElementById('page-dashboard').style.display = page === 'dashboard' ? 'block' : 'none';
+    document.getElementById('page-stocks').style.display   = page === 'stocks'    ? 'block' : 'none';
+    if (page === 'stocks') ConfigEditor.load();
+  },
+};
 
 // Dashboard
 const App = {
@@ -211,9 +228,167 @@ const App = {
     document.getElementById('last-updated').textContent =
       `마지막 업데이트: ${data[0].date}`;
   },
-
-  // ConfigEditor — CRUD 확장 예정
-  // addStock(ticker, alerts) { ... }
-  // editStock(ticker, alerts) { ... }
-  // deleteStock(ticker) { ... }
 };
+
+// Stock Management
+const ConfigEditor = {
+  sha: null,
+  stocks: [],
+  _editIndex: null,
+
+  async load() {
+    const list = document.getElementById('stocks-list');
+    list.innerHTML = '<p class="empty">불러오는 중...</p>';
+    try {
+      const res = await fetch('/.netlify/functions/get-config');
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      this.sha    = data.sha;
+      this.stocks = data.stocks || [];
+      this.render();
+    } catch (e) {
+      list.innerHTML = '<p class="empty">설정을 불러올 수 없습니다.</p>';
+    }
+  },
+
+  render() {
+    const el = document.getElementById('stocks-list');
+    if (!this.stocks.length) {
+      el.innerHTML = '<p class="empty">종목이 없습니다. 추가 버튼을 눌러 시작하세요.</p>';
+      return;
+    }
+    el.innerHTML = this.stocks.map((s, i) => `
+      <div class="stock-item card">
+        <div>
+          <div class="stock-ticker">${s.ticker}</div>
+          <div class="stock-alerts">알림 임계값: ${s.alerts.join(', ')}%</div>
+        </div>
+        <div class="stock-actions">
+          <button class="btn-ghost" onclick="ConfigEditor.openEdit(${i})">편집</button>
+          <button class="btn-ghost danger" onclick="ConfigEditor.confirmDelete(${i})">삭제</button>
+        </div>
+      </div>`).join('');
+  },
+
+  openAdd() {
+    this._editIndex = null;
+    document.getElementById('modal-title').textContent = '종목 추가';
+    document.getElementById('modal-ticker').value = '';
+    document.getElementById('modal-ticker').disabled = false;
+    document.getElementById('modal-alerts').value = '';
+    document.getElementById('stock-modal').style.display = 'flex';
+    document.getElementById('modal-ticker').focus();
+  },
+
+  openEdit(i) {
+    const s = this.stocks[i];
+    this._editIndex = i;
+    document.getElementById('modal-title').textContent = '종목 편집';
+    document.getElementById('modal-ticker').value = s.ticker;
+    document.getElementById('modal-ticker').disabled = true;
+    document.getElementById('modal-alerts').value = s.alerts.join(', ');
+    document.getElementById('stock-modal').style.display = 'flex';
+    document.getElementById('modal-alerts').focus();
+  },
+
+  closeModal() {
+    document.getElementById('stock-modal').style.display = 'none';
+  },
+
+  async saveModal() {
+    const ticker = document.getElementById('modal-ticker').value.trim().toUpperCase();
+    const alertsRaw = document.getElementById('modal-alerts').value;
+    const alerts = alertsRaw.split(',')
+      .map(s => parseInt(s.trim(), 10))
+      .filter(n => !isNaN(n) && n > 0);
+
+    if (!ticker) { alert('티커 심볼을 입력하세요.'); return; }
+    if (!alerts.length) { alert('유효한 임계값을 입력하세요. (예: 10, 15, 20)'); return; }
+
+    const btn = document.getElementById('modal-save');
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+
+    const newStocks = [...this.stocks];
+    if (this._editIndex !== null) {
+      newStocks[this._editIndex] = { ticker: newStocks[this._editIndex].ticker, alerts };
+    } else {
+      if (newStocks.find(s => s.ticker === ticker)) {
+        alert('이미 존재하는 티커입니다.');
+        btn.disabled = false;
+        btn.textContent = '저장';
+        return;
+      }
+      newStocks.push({ ticker, alerts });
+    }
+
+    const ok = await this._save(newStocks);
+    btn.disabled = false;
+    btn.textContent = '저장';
+    if (ok) this.closeModal();
+  },
+
+  confirmDelete(i) {
+    if (!confirm(`${this.stocks[i].ticker}을(를) 삭제할까요?`)) return;
+    this._save(this.stocks.filter((_, idx) => idx !== i));
+  },
+
+  async _save(newStocks) {
+    const user = netlifyIdentity.currentUser();
+    if (!user) { alert('로그인이 필요합니다.'); return false; }
+
+    let token;
+    try {
+      token = await user.jwt();
+    } catch (e) {
+      alert('인증 토큰을 가져올 수 없습니다. 다시 로그인하세요.');
+      return false;
+    }
+
+    try {
+      const res = await fetch('/.netlify/functions/update-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ stocks: newStocks, sha: this.sha }),
+      });
+
+      if (res.status === 409) {
+        alert('다른 곳에서 설정이 변경되었습니다. 목록을 새로 불러옵니다.');
+        await this.load();
+        return false;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert('저장 실패: ' + (err.error || res.status));
+        return false;
+      }
+
+      const data = await res.json();
+      this.sha    = data.sha;
+      this.stocks = newStocks;
+      this.render();
+      return true;
+    } catch (e) {
+      alert('네트워크 오류가 발생했습니다.');
+      return false;
+    }
+  },
+};
+
+// Modal event bindings
+document.getElementById('add-stock-btn').addEventListener('click', () => ConfigEditor.openAdd());
+document.getElementById('modal-cancel').addEventListener('click', () => ConfigEditor.closeModal());
+document.getElementById('modal-save').addEventListener('click', () => ConfigEditor.saveModal());
+document.getElementById('stock-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) ConfigEditor.closeModal();
+});
+document.getElementById('modal-ticker').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('modal-alerts').focus();
+});
+document.getElementById('modal-alerts').addEventListener('keydown', e => {
+  if (e.key === 'Enter') ConfigEditor.saveModal();
+});

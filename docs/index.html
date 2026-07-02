@@ -28,28 +28,58 @@
       <button id="logout-btn">로그아웃</button>
     </header>
 
-    <div id="summary" class="cards"></div>
+    <nav class="page-nav">
+      <button class="nav-tab active" data-page="dashboard">대시보드</button>
+      <button class="nav-tab" data-page="stocks">종목 관리</button>
+    </nav>
 
-    <div class="section-title">체크 이력</div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>날짜</th>
-            <th>종목</th>
-            <th>현재가</th>
-            <th>하락률</th>
-            <th>VIX</th>
-            <th>MA50</th>
-            <th>MA200</th>
-            <th>알림</th>
-          </tr>
-        </thead>
-        <tbody id="history-body"></tbody>
-      </table>
+    <div id="page-dashboard">
+      <div id="summary" class="cards"></div>
+
+      <div class="section-title">체크 이력</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>날짜</th>
+              <th>종목</th>
+              <th>현재가</th>
+              <th>하락률</th>
+              <th>VIX</th>
+              <th>MA50</th>
+              <th>MA200</th>
+              <th>알림</th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+
+      <div id="last-updated" class="last-updated"></div>
     </div>
 
-    <div id="last-updated" class="last-updated"></div>
+    <div id="page-stocks" style="display:none">
+      <div class="section-header">
+        <div class="section-title">종목 관리</div>
+        <button id="add-stock-btn" class="btn-primary">+ 종목 추가</button>
+      </div>
+      <div id="stocks-list"></div>
+    </div>
+  </div>
+
+  <!-- 종목 추가/편집 모달 -->
+  <div id="stock-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">종목 추가</div>
+      <label class="form-label">티커 심볼</label>
+      <input id="modal-ticker" class="form-input" placeholder="예: SPY" autocapitalize="characters">
+      <label class="form-label">알림 임계값 (%, 쉼표로 구분)</label>
+      <input id="modal-alerts" class="form-input" placeholder="예: 10, 15, 20">
+      <div class="modal-actions">
+        <button id="modal-cancel" class="btn-ghost">취소</button>
+        <button id="modal-save" class="btn-primary">저장</button>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>
