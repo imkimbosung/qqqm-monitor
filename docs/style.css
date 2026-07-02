@@ -429,3 +429,7 @@ tbody td {
   gap: 8px;
   margin-top: 24px;
 }
+
+/* ── Auth form ────────────────────────────────────── */
+.auth-input { margin-bottom: 10px; }
+.auth-error { color: #f87171; font-size: 0.8rem; min-height: 1.2em; margin: 4px 0 0; }

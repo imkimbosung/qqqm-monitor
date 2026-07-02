@@ -14,17 +14,95 @@ function showAuthGate() {
   document.getElementById('app').style.display = 'none';
 }
 
-netlifyIdentity.on('init', user => { user ? showApp() : showAuthGate(); });
-netlifyIdentity.on('login', () => { netlifyIdentity.close(); showApp(); });
-netlifyIdentity.on('logout', showAuthGate);
+const Auth = {
+  _token: null,
 
-document.getElementById('login-btn').addEventListener('click', () => {
-  netlifyIdentity.open('login');
-});
+  async init() {
+    const stored = sessionStorage.getItem('sb_token');
+    if (stored && await this._verify(stored)) {
+      this._token = stored;
+      showApp();
+    } else {
+      sessionStorage.removeItem('sb_token');
+      showAuthGate();
+    }
+  },
 
-document.getElementById('logout-btn').addEventListener('click', () => {
-  netlifyIdentity.logout();
+  async login() {
+    const email    = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value;
+    const errEl    = document.getElementById('auth-error');
+    const btn      = document.getElementById('login-btn');
+
+    if (!email || !password) {
+      errEl.textContent = '이메일과 비밀번호를 입력하세요.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = '로그인 중...';
+    errEl.textContent = '';
+
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/auth/v1/token?grant_type=password`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON },
+          body: JSON.stringify({ email, password }),
+        }
+      );
+
+      if (!res.ok) {
+        errEl.textContent = '이메일 또는 비밀번호가 올바르지 않습니다.';
+        return;
+      }
+
+      const data = await res.json();
+      this._token = data.access_token;
+      sessionStorage.setItem('sb_token', this._token);
+      showApp();
+    } catch {
+      errEl.textContent = '네트워크 오류가 발생했습니다.';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '로그인';
+    }
+  },
+
+  async logout() {
+    if (this._token) {
+      await fetch(`${SUPABASE_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this._token}`, apikey: SUPABASE_ANON },
+      }).catch(() => {});
+    }
+    this._token = null;
+    sessionStorage.removeItem('sb_token');
+    showAuthGate();
+  },
+
+  async _verify(token) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  getToken() { return this._token; },
+};
+
+Auth.init();
+
+document.getElementById('login-btn').addEventListener('click', () => Auth.login());
+document.getElementById('auth-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') Auth.login();
 });
+document.getElementById('logout-btn').addEventListener('click', () => Auth.logout());
 
 // Navigation
 const Nav = {
@@ -240,7 +318,7 @@ const ConfigEditor = {
     const list = document.getElementById('stocks-list');
     list.innerHTML = '<p class="empty">불러오는 중...</p>';
     try {
-      const res = await fetch('/.netlify/functions/get-config');
+      const res = await fetch('/api/get-config');
       if (!res.ok) throw new Error(res.status);
       const data = await res.json();
       this.sha    = data.sha;
@@ -334,19 +412,11 @@ const ConfigEditor = {
   },
 
   async _save(newStocks) {
-    const user = netlifyIdentity.currentUser();
-    if (!user) { alert('로그인이 필요합니다.'); return false; }
-
-    let token;
-    try {
-      token = await user.jwt();
-    } catch (e) {
-      alert('인증 토큰을 가져올 수 없습니다. 다시 로그인하세요.');
-      return false;
-    }
+    const token = Auth.getToken();
+    if (!token) { alert('로그인이 필요합니다.'); return false; }
 
     try {
-      const res = await fetch('/.netlify/functions/update-config', {
+      const res = await fetch('/api/update-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
