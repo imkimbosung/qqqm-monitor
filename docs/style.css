@@ -297,6 +297,16 @@ tbody td {
 .mini-fill.alert  { background: #fb923c; }
 .mini-fill.danger { background: #f87171; }
 
+/* ── 현재가/신고점 합친 카드 ──────────────────────────── */
+.price-pair  { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.price-arrow { color: #475569; flex-shrink: 0; font-size: 1rem; }
+.price-sub   { font-size: 0.68rem; }
+
+/* ── MA 합친 카드 ─────────────────────────────────────── */
+.ma-row  { display: flex; align-items: baseline; gap: 8px; margin-top: 6px; }
+.ma-name { font-size: 0.68rem; color: #64748b; width: 36px; flex-shrink: 0; }
+.value-sm { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.5px; }
+
 /* ── Ticker section header ────────────────────────── */
 .ticker-header {
   grid-column: 1 / -1;

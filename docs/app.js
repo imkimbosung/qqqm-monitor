@@ -120,6 +120,76 @@ const Nav = {
   },
 };
 
+// ── 종목 카드 정의 (추가/삭제: 이 배열만 수정) ────────────
+const TICKER_CARDS = [
+  {
+    render(app, row) {
+      return `
+        <div class="card">
+          <div class="label">현재가 / 역대 신고점</div>
+          <div class="price-pair">
+            <div>
+              <div class="value">$${Number(row.current).toFixed(2)}</div>
+              <div class="meta price-sub">현재가</div>
+            </div>
+            <div class="price-arrow">→</div>
+            <div>
+              <div class="value">$${Number(row.ath).toFixed(2)}</div>
+              <div class="meta price-sub">역대 신고점</div>
+            </div>
+          </div>
+          <div class="meta" style="margin-top:6px">${row.date}</div>
+        </div>`;
+    },
+  },
+  {
+    render(app, row) {
+      const cls = app.dropClass(row.drop_pct);
+      return `
+        <div class="card">
+          <div class="label">신고점 대비 하락률</div>
+          <div class="value ${cls}">-${Number(row.drop_pct).toFixed(2)}%</div>
+          <div class="meta">${row.alert_sent ? `⚠️ ${row.alert_sent}% 알림 발송` : '알림 없음'}</div>
+          ${app.renderThresholdBars(row.drop_pct)}
+        </div>`;
+    },
+  },
+  {
+    render(app, row) {
+      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
+      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
+      const fmt = (pct, price) => pct != null
+        ? `<span class="value-sm ${app.maClass(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
+           <span class="meta" style="margin-left:4px">$${Number(price).toFixed(2)}</span>`
+        : `<span class="meta">—</span>`;
+      return `
+        <div class="card">
+          <div class="label">이동평균 대비</div>
+          <div class="ma-row"><span class="ma-name">MA50</span>${fmt(ma50pct, row.ma50)}</div>
+          <div class="ma-row"><span class="ma-name">MA200</span>${fmt(ma200pct, row.ma200)}</div>
+        </div>`;
+    },
+  },
+];
+
+// ── 시장 지표 컬럼 정의 (추가/삭제: 이 배열만 수정) ──────
+const MARKET_COLS = [
+  {
+    key: 'vix',
+    label: 'VIX 공포지수',
+    render(app, row) {
+      if (row.vix == null) return '<span style="color:#475569">—</span>';
+      const cls = app.vixClass(row.vix);
+      const lbl = app.vixLabel(row.vix);
+      return `<div style="display:flex;align-items:center;gap:8px">
+        <span class="${cls}" style="font-weight:700">${Number(row.vix).toFixed(1)}</span>
+        <span style="color:#64748b;font-size:0.75rem">${lbl}</span>
+        <div class="mini-gauge"><div class="mini-fill ${cls}" style="width:${Math.min(row.vix/50*100,100).toFixed(0)}%"></div></div>
+      </div>`;
+    },
+  },
+];
+
 // Dashboard
 const App = {
   async init() {
@@ -141,6 +211,7 @@ const App = {
         ma200:      r.ma200,
       }));
       this.renderSummary(data);
+      this.renderMarketTable(data);
       this.renderTable(data);
       this.renderLastUpdated(data);
     } catch (e) {
@@ -219,83 +290,28 @@ const App = {
       el.innerHTML = '<p class="empty">아직 기록이 없습니다. 첫 번째 실행 후 표시됩니다.</p>';
       return;
     }
-
-    // 종목별 최신 레코드 추출
     const seen = new Set();
     const perTicker = [];
     for (const row of data) {
       if (!seen.has(row.ticker)) { seen.add(row.ticker); perTicker.push(row); }
     }
-
-    const vixRow = data[0];
-    const vCls = vixRow.vix != null ? this.vixClass(vixRow.vix) : '';
-    const vLbl = vixRow.vix != null ? this.vixLabel(vixRow.vix) : '—';
-
-    const tickerCards = perTicker.map((row, i) => {
-      const cls      = this.dropClass(row.drop_pct);
-      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
-      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
-      const ma50Cls  = ma50pct  != null ? this.maClass(ma50pct)  : '';
-      const ma200Cls = ma200pct != null ? this.maClass(ma200pct) : '';
-      return `
-        <div class="ticker-header${i === 0 ? ' first' : ''}">${row.ticker}</div>
-        <div class="card">
-          <div class="label">현재가</div>
-          <div class="value">$${Number(row.current).toFixed(2)}</div>
-          <div class="meta">${row.date}</div>
-        </div>
-        <div class="card">
-          <div class="label">역대 신고점</div>
-          <div class="value">$${Number(row.ath).toFixed(2)}</div>
-          <div class="meta">수정주가 기준</div>
-        </div>
-        <div class="card">
-          <div class="label">신고점 대비 하락률</div>
-          <div class="value ${cls}">-${Number(row.drop_pct).toFixed(2)}%</div>
-          <div class="meta">${row.alert_sent ? `⚠️ ${row.alert_sent}% 알림 발송` : '알림 없음'}</div>
-          ${this.renderThresholdBars(row.drop_pct)}
-        </div>
-        <div class="card">
-          <div class="label">MA50 대비</div>
-          <div class="value ${ma50Cls}">${ma50pct != null ? (ma50pct >= 0 ? '+' : '') + ma50pct.toFixed(2) + '%' : '—'}</div>
-          <div class="meta">${row.ma50 != null ? '$' + Number(row.ma50).toFixed(2) : '데이터 없음'}</div>
-        </div>
-        <div class="card">
-          <div class="label">MA200 대비</div>
-          <div class="value ${ma200Cls}">${ma200pct != null ? (ma200pct >= 0 ? '+' : '') + ma200pct.toFixed(2) + '%' : '—'}</div>
-          <div class="meta">${row.ma200 != null ? '$' + Number(row.ma200).toFixed(2) : '데이터 없음'}</div>
-        </div>
-      `;
-    }).join('');
-
-    el.innerHTML = tickerCards + `
-      <div class="ticker-header">시장 지표</div>
-      <div class="card">
-        <div class="label">VIX 공포지수</div>
-        <div class="value ${vCls}">${vixRow.vix != null ? Number(vixRow.vix).toFixed(1) : '—'}</div>
-        <div class="meta">${vLbl}</div>
-        ${vixRow.vix != null ? this.renderVixGauge(vixRow.vix) : ''}
-      </div>
-    `;
+    el.innerHTML = perTicker.map((row, i) =>
+      `<div class="ticker-header${i === 0 ? ' first' : ''}">${row.ticker}</div>` +
+      TICKER_CARDS.map(c => c.render(this, row)).join('')
+    ).join('');
   },
 
   renderTable(data) {
     const tbody = document.getElementById('history-body');
     if (!data.length) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty">기록 없음</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">기록 없음</td></tr>';
       return;
     }
     tbody.innerHTML = data.map(row => {
-      const cls  = this.dropClass(row.drop_pct);
-      const vCls = row.vix != null ? this.vixClass(row.vix) : '';
+      const cls = this.dropClass(row.drop_pct);
       const alertCell = row.alert_sent
         ? `<span class="badge">${row.alert_sent}% 발송</span>`
         : '<span style="color:#475569">—</span>';
-      const vixCell = row.vix != null ? `
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="${vCls}">${Number(row.vix).toFixed(1)}</span>
-          <div class="mini-gauge"><div class="mini-fill ${vCls}" style="width:${Math.min(row.vix/50*100,100).toFixed(0)}%"></div></div>
-        </div>` : '<span style="color:#475569">—</span>';
       const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
       const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
       const fmtMa = pct => pct != null
@@ -307,13 +323,37 @@ const App = {
           <td>${row.ticker}</td>
           <td>$${Number(row.current).toFixed(2)}</td>
           <td class="${cls}">-${Number(row.drop_pct).toFixed(2)}%</td>
-          <td>${vixCell}</td>
           <td>${fmtMa(ma50pct)}</td>
           <td>${fmtMa(ma200pct)}</td>
           <td>${alertCell}</td>
         </tr>
       `;
     }).join('');
+  },
+
+  renderMarketTable(data) {
+    const thead = document.getElementById('market-head');
+    const tbody = document.getElementById('market-body');
+    if (!thead || !tbody) return;
+
+    const seen = new Set();
+    const byDate = [];
+    for (const row of data) {
+      if (!seen.has(row.date)) { seen.add(row.date); byDate.push(row); }
+    }
+
+    thead.innerHTML = `<tr>
+      <th>날짜</th>
+      ${MARKET_COLS.map(c => `<th>${c.label}</th>`).join('')}
+    </tr>`;
+
+    tbody.innerHTML = byDate.length
+      ? byDate.map(row => `
+          <tr>
+            <td>${row.date}</td>
+            ${MARKET_COLS.map(c => `<td>${c.render(this, row)}</td>`).join('')}
+          </tr>`).join('')
+      : `<tr><td colspan="${1 + MARKET_COLS.length}" class="empty">기록 없음</td></tr>`;
   },
 
   renderLastUpdated(data) {
