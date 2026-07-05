@@ -357,7 +357,7 @@ const App = {
       return `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="#475569">${v}</text>`;
     }).join('');
     return `
-      <svg viewBox="0 0 240 148" style="width:100%;max-width:300px;display:block;margin:8px auto 0">
+      <svg viewBox="0 0 240 158" style="width:100%;max-width:300px;display:block;margin:8px auto 0">
         ${zones.map(z => `<path d="${arcPath(z.from, z.to)}" fill="${z.color}" opacity="0.85"/>`).join('')}
         ${tickLabels}
         <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round"/>
@@ -395,7 +395,7 @@ const App = {
       return `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="#475569">${v}</text>`;
     }).join('');
     return `
-      <svg viewBox="0 0 240 148" style="width:100%;max-width:300px;display:block;margin:8px auto 0">
+      <svg viewBox="0 0 240 158" style="width:100%;max-width:300px;display:block;margin:8px auto 0">
         ${zones.map(z => `<path d="${arcPath(z.from, z.to)}" fill="${z.color}" opacity="0.85"/>`).join('')}
         ${tickLabels}
         <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round"/>
