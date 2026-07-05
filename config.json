@@ -2,7 +2,19 @@
   "stocks": [
     {
       "ticker": "QQQM",
-      "alerts": [10, 15, 20]
+      "alerts": [
+        10,
+        15,
+        20
+      ]
+    },
+    {
+      "ticker": "QQQI",
+      "alerts": [
+        10,
+        15,
+        20
+      ]
     }
   ]
 }
