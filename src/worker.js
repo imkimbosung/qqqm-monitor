@@ -134,9 +134,14 @@ async function handleLivePrices(env) {
   ).then(r => r.json()).then(d => d.chart?.result?.[0]?.meta?.regularMarketPrice ?? null).catch(() => null);
 
   const [vix, fngRaw, ...prices] = await Promise.all([
-    yahooFetch('%5EVIX'),
-    fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata')
-      .then(r => r.json()).catch(() => null),
+    yahooFetch('^VIX'),
+    fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://edition.cnn.com/markets/fear-and-greed',
+        'Origin': 'https://edition.cnn.com',
+      },
+    }).then(r => r.json()).catch(() => null),
     ...tickers.map(t => yahooFetch(t)),
   ]);
 
