@@ -441,6 +441,12 @@ const ConfigEditor = {
       this.sha    = data.sha;
       this.stocks = newStocks;
       this.render();
+      const notice = document.createElement('p');
+      notice.className = 'empty';
+      notice.style.color = '#4ade80';
+      notice.textContent = '저장 완료. 다음 자동 실행 시 대시보드에 반영됩니다.';
+      document.getElementById('stocks-list').prepend(notice);
+      setTimeout(() => notice.remove(), 4000);
       return true;
     } catch (e) {
       alert('네트워크 오류가 발생했습니다.');
