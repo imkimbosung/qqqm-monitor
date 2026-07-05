@@ -123,6 +123,7 @@ const Nav = {
 };
 
 // ── 종목 카드 정의 (추가/삭제: 이 배열만 수정) ────────────
+// row: { ticker, price, ath, drop_pct, ma50, ma200, fired_alerts }
 const TICKER_CARDS = [
   {
     render(app, row) {
@@ -131,7 +132,7 @@ const TICKER_CARDS = [
           <div class="label">현재가 / 역대 신고점</div>
           <div class="price-pair">
             <div>
-              <div class="value">$${Number(row.current).toFixed(2)}</div>
+              <div class="value">$${Number(row.price).toFixed(2)}</div>
               <div class="meta price-sub">현재가</div>
             </div>
             <div class="price-arrow">→</div>
@@ -140,26 +141,28 @@ const TICKER_CARDS = [
               <div class="meta price-sub">역대 신고점</div>
             </div>
           </div>
-          <div class="meta" style="margin-top:6px">${row.date}</div>
         </div>`;
     },
   },
   {
     render(app, row) {
       const cls = app.dropClass(row.drop_pct);
+      const alertText = row.fired_alerts && row.fired_alerts.length
+        ? `⚠️ ${Math.max(...row.fired_alerts)}% 알림 발송됨`
+        : '알림 없음';
       return `
         <div class="card">
           <div class="label">신고점 대비 하락률</div>
           <div class="value ${cls}">-${Number(row.drop_pct).toFixed(2)}%</div>
-          <div class="meta">${row.alert_sent ? `⚠️ ${row.alert_sent}% 알림 발송` : '알림 없음'}</div>
+          <div class="meta">${alertText}</div>
           ${app.renderThresholdBars(row.drop_pct)}
         </div>`;
     },
   },
   {
     render(app, row) {
-      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
-      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
+      const ma50pct  = row.ma50  != null ? ((row.price / row.ma50  - 1) * 100) : null;
+      const ma200pct = row.ma200 != null ? ((row.price / row.ma200 - 1) * 100) : null;
       const fmt = (pct, price) => pct != null
         ? `<span class="value-sm ${app.maClass(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
            <span class="meta" style="margin-left:4px">$${Number(price).toFixed(2)}</span>`
@@ -175,19 +178,19 @@ const TICKER_CARDS = [
 ];
 
 // ── 시장 지표 컬럼 정의 (추가/삭제: 이 배열만 수정) ──────
+// dashboardRender(app, live): live = { tickers, vix, fearGreed, timestamp }
+// render(app, row): row = 이력 테이블 행 (Supabase monitor_history 데이터)
 const MARKET_COLS = [
   {
     key: 'vix',
     label: 'VIX 공포지수',
-    // 대시보드: 반원형 게이지 카드
-    dashboardRender(app, row) {
-      if (row.vix == null) return '';
+    dashboardRender(app, live) {
+      if (live.vix == null) return '';
       return `<div class="card gauge-card">
         <div class="label">VIX 공포지수</div>
-        ${app.renderVixGaugeLarge(row.vix)}
+        ${app.renderVixGaugeLarge(live.vix)}
       </div>`;
     },
-    // 이력 테이블 셀
     render(app, row) {
       if (row.vix == null) return '<span style="color:#475569">—</span>';
       const cls = app.vixClass(row.vix);
@@ -199,18 +202,41 @@ const MARKET_COLS = [
       </div>`;
     },
   },
+  {
+    key: 'fearGreed',
+    label: '공포탐욕지수 (CNN)',
+    dashboardRender(app, live) {
+      if (!live.fearGreed || live.fearGreed.score == null) return '';
+      return `<div class="card gauge-card">
+        <div class="label">공포탐욕지수 (CNN)</div>
+        ${app.renderFearGreedGaugeLarge(live.fearGreed.score)}
+      </div>`;
+    },
+    render(app, row) {
+      return '<span style="color:#475569">—</span>';
+    },
+  },
 ];
 
 // Dashboard
 const App = {
   async init() {
+    document.getElementById('summary').innerHTML =
+      '<p class="empty" style="grid-column:1/-1">불러오는 중...</p>';
+
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/monitor_history?order=date.desc,id.desc&limit=90`,
-        { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
-      );
-      const rows = await res.json();
-      const data = rows.map(r => ({
+      const [liveRes, histRes] = await Promise.all([
+        fetch('/api/live-prices'),
+        fetch(
+          `${SUPABASE_URL}/rest/v1/monitor_history?order=date.desc,id.desc&limit=90`,
+          { headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` } }
+        ),
+      ]);
+
+      const live = await liveRes.json();
+      const rows = await histRes.json();
+
+      const histData = rows.map(r => ({
         date:       r.date,
         ticker:     r.ticker,
         current:    r.current_price,
@@ -221,11 +247,12 @@ const App = {
         ma50:       r.ma50,
         ma200:      r.ma200,
       }));
-      this.renderSummary(data);
-      this.renderMarketSummary(data);
-      this.renderMarketTable(data);
-      this.renderTable(data);
-      this.renderLastUpdated(data);
+
+      this.renderSummary(live.tickers || []);
+      this.renderMarketSummary(live);
+      this.renderMarketTable(histData);
+      this.renderTable(histData);
+      this.renderLastUpdated(live.timestamp);
     } catch (e) {
       document.getElementById('summary').innerHTML =
         '<p class="empty">데이터를 불러올 수 없습니다.</p>';
@@ -259,6 +286,21 @@ const App = {
     return 'danger';
   },
 
+  fngClass(score) {
+    if (score <= 25) return 'danger';
+    if (score <= 45) return 'alert';
+    if (score <= 55) return 'warn';
+    return 'safe';
+  },
+
+  fngLabel(score) {
+    if (score <= 25) return '극도 공포';
+    if (score <= 45) return '공포';
+    if (score <= 55) return '중립';
+    if (score <= 75) return '탐욕';
+    return '극도 탐욕';
+  },
+
   renderThresholdBars(drop_pct) {
     const thresholds = [10, 15, 20];
     return `
@@ -278,69 +320,6 @@ const App = {
             </div>`;
         }).join('')}
       </div>`;
-  },
-
-  renderVixGauge(v) {
-    if (v == null) return '<span style="color:#475569">—</span>';
-    const pct = Math.min(v / 50 * 100, 100).toFixed(1);
-    const cls = this.vixClass(v);
-    return `
-      <div class="gauge-wrap">
-        <div class="gauge-bar">
-          <div class="gauge-fill ${cls}" style="width:${pct}%"></div>
-        </div>
-        <div class="gauge-labels">
-          <span>안정</span><span>보통</span><span>공포</span><span>극도</span>
-        </div>
-      </div>
-    `;
-  },
-
-  renderSummary(data) {
-    const el = document.getElementById('summary');
-    if (!data.length) {
-      el.innerHTML = '<p class="empty">아직 기록이 없습니다. 첫 번째 실행 후 표시됩니다.</p>';
-      return;
-    }
-    const seen = new Set();
-    const perTicker = [];
-    for (const row of data) {
-      if (!seen.has(row.ticker)) { seen.add(row.ticker); perTicker.push(row); }
-    }
-    el.innerHTML = perTicker.map((row, i) =>
-      `<div class="ticker-header${i === 0 ? ' first' : ''}">${row.ticker}</div>` +
-      TICKER_CARDS.map(c => c.render(this, row)).join('')
-    ).join('');
-  },
-
-  renderTable(data) {
-    const tbody = document.getElementById('history-body');
-    if (!data.length) {
-      tbody.innerHTML = '<tr><td colspan="7" class="empty">기록 없음</td></tr>';
-      return;
-    }
-    tbody.innerHTML = data.map(row => {
-      const cls = this.dropClass(row.drop_pct);
-      const alertCell = row.alert_sent
-        ? `<span class="badge">${row.alert_sent}% 발송</span>`
-        : '<span style="color:#475569">—</span>';
-      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
-      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
-      const fmtMa = pct => pct != null
-        ? `<span class="${this.maClass(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span>`
-        : '<span style="color:#475569">—</span>';
-      return `
-        <tr class="${row.alert_sent ? 'alerted' : ''}">
-          <td>${row.date}</td>
-          <td>${row.ticker}</td>
-          <td>$${Number(row.current).toFixed(2)}</td>
-          <td class="${cls}">-${Number(row.drop_pct).toFixed(2)}%</td>
-          <td>${fmtMa(ma50pct)}</td>
-          <td>${fmtMa(ma200pct)}</td>
-          <td>${alertCell}</td>
-        </tr>
-      `;
-    }).join('');
   },
 
   renderVixGaugeLarge(vix) {
@@ -380,14 +359,93 @@ const App = {
       </svg>`;
   },
 
-  renderMarketSummary(data) {
+  renderFearGreedGaugeLarge(score) {
+    const cx = 120, cy = 110, R = 95, r = 65;
+    const toRad = v => (1 - Math.min(Math.max(v, 0), 100) / 100) * Math.PI;
+    const pt = (radius, v) => {
+      const a = toRad(v);
+      return [cx + radius * Math.cos(a), cy - radius * Math.sin(a)];
+    };
+    const arcPath = (from, to) => {
+      const [x1, y1] = pt(R, from);
+      const [x2, y2] = pt(R, to);
+      const [x3, y3] = pt(r, to);
+      const [x4, y4] = pt(r, from);
+      return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L ${x3.toFixed(2)} ${y3.toFixed(2)} A ${r} ${r} 0 0 0 ${x4.toFixed(2)} ${y4.toFixed(2)} Z`;
+    };
+    const zones = [
+      { from: 0,  to: 25,  color: '#f87171' },
+      { from: 25, to: 45,  color: '#fb923c' },
+      { from: 45, to: 55,  color: '#facc15' },
+      { from: 55, to: 75,  color: '#4ade80' },
+      { from: 75, to: 100, color: '#16a34a' },
+    ];
+    const [nx, ny] = pt(R - 8, +score);
+    const lbl = this.fngLabel(score);
+    const tickLabels = [0, 25, 50, 75, 100].map(v => {
+      const [tx, ty] = pt(R + 10, v);
+      return `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="#475569">${v}</text>`;
+    }).join('');
+    return `
+      <svg viewBox="0 0 240 148" style="width:100%;max-width:300px;display:block;margin:8px auto 0">
+        ${zones.map(z => `<path d="${arcPath(z.from, z.to)}" fill="${z.color}" opacity="0.85"/>`).join('')}
+        ${tickLabels}
+        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${cx}" cy="${cy}" r="5" fill="#e2e8f0"/>
+        <text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="26" font-weight="700" fill="#e2e8f0">${Number(score).toFixed(0)}</text>
+        <text x="${cx}" y="${cy + 40}" text-anchor="middle" font-size="11" fill="#94a3b8">${lbl}</text>
+      </svg>`;
+  },
+
+  renderSummary(tickers) {
+    const el = document.getElementById('summary');
+    if (!tickers.length) {
+      el.innerHTML = '<p class="empty">아직 기록이 없습니다. 첫 번째 실행 후 표시됩니다.</p>';
+      return;
+    }
+    el.innerHTML = tickers.map((row, i) =>
+      `<div class="ticker-header${i === 0 ? ' first' : ''}">${row.ticker}</div>` +
+      TICKER_CARDS.map(c => c.render(this, row)).join('')
+    ).join('');
+  },
+
+  renderTable(data) {
+    const tbody = document.getElementById('history-body');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">기록 없음</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(row => {
+      const cls = this.dropClass(row.drop_pct);
+      const alertCell = row.alert_sent
+        ? `<span class="badge">${row.alert_sent}% 발송</span>`
+        : '<span style="color:#475569">—</span>';
+      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
+      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
+      const fmtMa = pct => pct != null
+        ? `<span class="${this.maClass(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%</span>`
+        : '<span style="color:#475569">—</span>';
+      return `
+        <tr class="${row.alert_sent ? 'alerted' : ''}">
+          <td>${row.date}</td>
+          <td>${row.ticker}</td>
+          <td>$${Number(row.current).toFixed(2)}</td>
+          <td class="${cls}">-${Number(row.drop_pct).toFixed(2)}%</td>
+          <td>${fmtMa(ma50pct)}</td>
+          <td>${fmtMa(ma200pct)}</td>
+          <td>${alertCell}</td>
+        </tr>
+      `;
+    }).join('');
+  },
+
+  renderMarketSummary(live) {
     const el = document.getElementById('market-summary');
-    if (!el || !data.length) return;
-    const latest = data[0];
+    if (!el) return;
     el.innerHTML = `
       <div class="section-title" style="margin-top:20px;margin-bottom:12px">시장 지표</div>
       <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:28px">
-        ${MARKET_COLS.map(c => c.dashboardRender(this, latest)).join('')}
+        ${MARKET_COLS.map(c => c.dashboardRender(this, live)).join('')}
       </div>`;
   },
 
@@ -416,10 +474,15 @@ const App = {
       : `<tr><td colspan="${1 + MARKET_COLS.length}" class="empty">기록 없음</td></tr>`;
   },
 
-  renderLastUpdated(data) {
-    if (!data.length) return;
-    document.getElementById('last-updated').textContent =
-      `마지막 업데이트: ${data[0].date}`;
+  renderLastUpdated(timestamp) {
+    const el = document.getElementById('last-updated');
+    if (!el) return;
+    try {
+      const hms = new Date(timestamp).toLocaleTimeString('ko-KR');
+      el.textContent = `실시간 조회: ${hms}`;
+    } catch {
+      el.textContent = '';
+    }
   },
 };
 

@@ -99,6 +99,69 @@ async function handleUpdateConfig(request, env) {
   return json({ success: true, sha: ghData.content.sha });
 }
 
+async function handleLivePrices(env) {
+  const { SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_TOKEN, REPO_OWNER, REPO_NAME } = env;
+  if (!GITHUB_TOKEN || !REPO_OWNER || !REPO_NAME || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return json({ error: 'Missing environment variables' }, 500);
+  }
+
+  const ghRes = await fetch(
+    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/config.json`,
+    {
+      headers: {
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'qqqm-monitor',
+      },
+    }
+  );
+  if (!ghRes.ok) return json({ error: 'Failed to fetch config' }, 502);
+  const ghData = await ghRes.json();
+  const config = JSON.parse(atob(ghData.content.replace(/\s/g, '')));
+  const tickers = (config.stocks || []).map(s => s.ticker);
+
+  const stateRows = await fetch(`${SUPABASE_URL}/rest/v1/monitor_state?select=*`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+  }).then(r => r.json()).catch(() => []);
+  const stateMap = Object.fromEntries(
+    (Array.isArray(stateRows) ? stateRows : []).map(r => [r.ticker, r])
+  );
+
+  const yahooFetch = sym => fetch(
+    `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1d`,
+    { headers: { 'User-Agent': 'Mozilla/5.0' } }
+  ).then(r => r.json()).then(d => d.chart?.result?.[0]?.meta?.regularMarketPrice ?? null).catch(() => null);
+
+  const [vix, fngRaw, ...prices] = await Promise.all([
+    yahooFetch('%5EVIX'),
+    fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata')
+      .then(r => r.json()).catch(() => null),
+    ...tickers.map(t => yahooFetch(t)),
+  ]);
+
+  const fearGreed = (fngRaw && fngRaw.fear_and_greed)
+    ? { score: fngRaw.fear_and_greed.score, rating: fngRaw.fear_and_greed.rating }
+    : null;
+
+  const tickerResults = tickers.map((ticker, i) => {
+    const price = prices[i];
+    const st    = stateMap[ticker] || {};
+    const ath   = st.all_time_high ? Number(st.all_time_high) : null;
+    return {
+      ticker,
+      price,
+      ath,
+      drop_pct:     (ath && price) ? (1 - price / ath) * 100 : null,
+      ma50:         st.ma50  ?? null,
+      ma200:        st.ma200 ?? null,
+      fired_alerts: st.fired_alerts ?? [],
+    };
+  });
+
+  return json({ tickers: tickerResults, vix, fearGreed, timestamp: new Date().toISOString() });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -108,6 +171,9 @@ export default {
     }
     if (url.pathname === '/api/update-config' && request.method === 'POST') {
       return handleUpdateConfig(request, env);
+    }
+    if (url.pathname === '/api/live-prices' && request.method === 'GET') {
+      return handleLivePrices(env);
     }
 
     return env.ASSETS.fetch(request);

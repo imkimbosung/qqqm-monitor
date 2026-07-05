@@ -87,6 +87,8 @@ def monitor():
             "ticker": ticker,
             "all_time_high": rec["all_time_high"],
             "fired_alerts": rec["fired_alerts"],
+            "ma50": ma50,
+            "ma200": ma200,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }).execute()
 
