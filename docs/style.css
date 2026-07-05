@@ -459,3 +459,35 @@ tbody td {
 /* ── Auth form ────────────────────────────────────── */
 .auth-input { margin-bottom: 10px; }
 .auth-error { color: #f87171; font-size: 0.8rem; min-height: 1.2em; margin: 4px 0 0; }
+
+/* ── 로딩 프로그레스바 ──────────────────────────── */
+#loading-bar {
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 50%, #3b82f6 100%);
+  background-size: 200% 100%;
+  animation: loadingSlide 1.2s linear infinite;
+  z-index: 1000;
+  display: none;
+}
+@keyframes loadingSlide {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── DB 폴백 배지 ────────────────────────────────── */
+.badge-fallback {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.2);
+  color: #94a3b8;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: 0;
+  text-transform: none;
+}

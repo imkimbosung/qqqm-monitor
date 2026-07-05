@@ -133,7 +133,7 @@ async function handleLivePrices(env) {
     { headers: { 'User-Agent': 'Mozilla/5.0' } }
   ).then(r => r.json()).then(d => d.chart?.result?.[0]?.meta?.regularMarketPrice ?? null).catch(() => null);
 
-  const [vix, fngRaw, ...prices] = await Promise.all([
+  const [yahooVix, fngRaw, ...prices] = await Promise.all([
     yahooFetch('^VIX'),
     fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {
       headers: {
@@ -148,6 +148,20 @@ async function handleLivePrices(env) {
   const fearGreed = (fngRaw && fngRaw.fear_and_greed)
     ? { score: fngRaw.fear_and_greed.score, rating: fngRaw.fear_and_greed.rating }
     : null;
+
+  // VIX: Yahoo 실패 시 Supabase monitor_history 최신값으로 폴백
+  let vix = yahooVix;
+  let vixDate = null;
+  if (vix == null) {
+    const vixRows = await fetch(
+      `${SUPABASE_URL}/rest/v1/monitor_history?select=vix,date&vix=not.is.null&order=date.desc,id.desc&limit=1`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
+    ).then(r => r.json()).catch(() => []);
+    if (Array.isArray(vixRows) && vixRows[0]) {
+      vix = vixRows[0].vix;
+      vixDate = vixRows[0].date;
+    }
+  }
 
   const tickerResults = tickers.map((ticker, i) => {
     const price = prices[i];
@@ -164,7 +178,7 @@ async function handleLivePrices(env) {
     };
   });
 
-  return json({ tickers: tickerResults, vix, fearGreed, timestamp: new Date().toISOString() });
+  return json({ tickers: tickerResults, vix, vixDate, fearGreed, timestamp: new Date().toISOString() });
 }
 
 export default {

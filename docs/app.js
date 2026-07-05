@@ -186,8 +186,11 @@ const MARKET_COLS = [
     label: 'VIX 공포지수',
     dashboardRender(app, live) {
       if (live.vix == null) return '';
+      const fallbackBadge = live.vixDate
+        ? `<span class="badge-fallback">${live.vixDate} 기준</span>`
+        : '';
       return `<div class="card gauge-card">
-        <div class="label">VIX 공포지수</div>
+        <div class="label">VIX 공포지수${fallbackBadge}</div>
         ${app.renderVixGaugeLarge(live.vix)}
       </div>`;
     },
@@ -221,6 +224,9 @@ const MARKET_COLS = [
 // Dashboard
 const App = {
   async init() {
+    const bar = document.getElementById('loading-bar');
+    if (bar) bar.style.display = 'block';
+
     document.getElementById('summary').innerHTML =
       '<p class="empty" style="grid-column:1/-1">불러오는 중...</p>';
 
@@ -256,6 +262,8 @@ const App = {
     } catch (e) {
       document.getElementById('summary').innerHTML =
         '<p class="empty">데이터를 불러올 수 없습니다.</p>';
+    } finally {
+      if (bar) bar.style.display = 'none';
     }
   },
 
