@@ -115,8 +115,10 @@ const Nav = {
     document.querySelectorAll('.nav-tab').forEach(b =>
       b.classList.toggle('active', b.dataset.page === page));
     document.getElementById('page-dashboard').style.display = page === 'dashboard' ? 'block' : 'none';
-    document.getElementById('page-stocks').style.display   = page === 'stocks'    ? 'block' : 'none';
-    if (page === 'stocks') ConfigEditor.load();
+    document.getElementById('page-history').style.display   = page === 'history'   ? 'block' : 'none';
+    document.getElementById('page-stocks').style.display    = page === 'stocks'    ? 'block' : 'none';
+    if (page === 'dashboard') App.init();
+    if (page === 'stocks')    ConfigEditor.load();
   },
 };
 
@@ -177,6 +179,15 @@ const MARKET_COLS = [
   {
     key: 'vix',
     label: 'VIX 공포지수',
+    // 대시보드: 반원형 게이지 카드
+    dashboardRender(app, row) {
+      if (row.vix == null) return '';
+      return `<div class="card gauge-card">
+        <div class="label">VIX 공포지수</div>
+        ${app.renderVixGaugeLarge(row.vix)}
+      </div>`;
+    },
+    // 이력 테이블 셀
     render(app, row) {
       if (row.vix == null) return '<span style="color:#475569">—</span>';
       const cls = app.vixClass(row.vix);
@@ -211,6 +222,7 @@ const App = {
         ma200:      r.ma200,
       }));
       this.renderSummary(data);
+      this.renderMarketSummary(data);
       this.renderMarketTable(data);
       this.renderTable(data);
       this.renderLastUpdated(data);
@@ -329,6 +341,54 @@ const App = {
         </tr>
       `;
     }).join('');
+  },
+
+  renderVixGaugeLarge(vix) {
+    const cx = 120, cy = 110, R = 95, r = 65;
+    const toRad = v => (1 - Math.min(Math.max(v, 0), 50) / 50) * Math.PI;
+    const pt = (radius, v) => {
+      const a = toRad(v);
+      return [cx + radius * Math.cos(a), cy - radius * Math.sin(a)];
+    };
+    const arcPath = (from, to) => {
+      const [x1, y1] = pt(R, from);
+      const [x2, y2] = pt(R, to);
+      const [x3, y3] = pt(r, to);
+      const [x4, y4] = pt(r, from);
+      return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L ${x3.toFixed(2)} ${y3.toFixed(2)} A ${r} ${r} 0 0 0 ${x4.toFixed(2)} ${y4.toFixed(2)} Z`;
+    };
+    const zones = [
+      { from: 0,  to: 15, color: '#4ade80' },
+      { from: 15, to: 20, color: '#facc15' },
+      { from: 20, to: 30, color: '#fb923c' },
+      { from: 30, to: 50, color: '#f87171' },
+    ];
+    const [nx, ny] = pt(R - 8, +vix);
+    const lbl = this.vixLabel(vix);
+    const tickLabels = [0, 15, 20, 30, 50].map(v => {
+      const [tx, ty] = pt(R + 10, v);
+      return `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="8" fill="#475569">${v}</text>`;
+    }).join('');
+    return `
+      <svg viewBox="0 0 240 148" style="width:100%;max-width:300px;display:block;margin:8px auto 0">
+        ${zones.map(z => `<path d="${arcPath(z.from, z.to)}" fill="${z.color}" opacity="0.85"/>`).join('')}
+        ${tickLabels}
+        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round"/>
+        <circle cx="${cx}" cy="${cy}" r="5" fill="#e2e8f0"/>
+        <text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="26" font-weight="700" fill="#e2e8f0">${Number(vix).toFixed(1)}</text>
+        <text x="${cx}" y="${cy + 40}" text-anchor="middle" font-size="11" fill="#94a3b8">${lbl}</text>
+      </svg>`;
+  },
+
+  renderMarketSummary(data) {
+    const el = document.getElementById('market-summary');
+    if (!el || !data.length) return;
+    const latest = data[0];
+    el.innerHTML = `
+      <div class="section-title" style="margin-top:20px;margin-bottom:12px">시장 지표</div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:28px">
+        ${MARKET_COLS.map(c => c.dashboardRender(this, latest)).join('')}
+      </div>`;
   },
 
   renderMarketTable(data) {

@@ -31,21 +31,25 @@
 
     <nav class="page-nav">
       <button class="nav-tab active" data-page="dashboard">대시보드</button>
+      <button class="nav-tab" data-page="history">이력</button>
       <button class="nav-tab" data-page="stocks">종목 관리</button>
     </nav>
 
     <div id="page-dashboard">
       <div id="summary" class="cards"></div>
+      <div id="market-summary"></div>
+      <div id="last-updated" class="last-updated"></div>
+    </div>
 
-      <div class="section-title" style="margin-bottom:12px">시장 지표</div>
+    <div id="page-history" style="display:none">
+      <div class="section-title" style="margin-bottom:12px">시장 지표 이력</div>
       <div class="table-wrap" style="margin-bottom:28px">
         <table>
           <thead id="market-head"></thead>
           <tbody id="market-body"></tbody>
         </table>
       </div>
-
-      <div class="section-title">체크 이력</div>
+      <div class="section-title">종목 이력</div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -62,8 +66,6 @@
           <tbody id="history-body"></tbody>
         </table>
       </div>
-
-      <div id="last-updated" class="last-updated"></div>
     </div>
 
     <div id="page-stocks" style="display:none">
