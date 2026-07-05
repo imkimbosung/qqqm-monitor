@@ -18,10 +18,14 @@ async function handleGetConfig(env) {
         Authorization: `Bearer ${GITHUB_TOKEN}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'qqqm-monitor',
       },
     }
   );
-  if (!res.ok) return json({ error: 'GitHub API error' }, res.status);
+  if (!res.ok) {
+    const text = await res.text();
+    return json({ error: 'GitHub API error', status: res.status, detail: text }, res.status);
+  }
 
   const ghData = await res.json();
   const config = JSON.parse(atob(ghData.content.replace(/\s/g, '')));
@@ -76,6 +80,7 @@ async function handleUpdateConfig(request, env) {
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type': 'application/json',
+        'User-Agent': 'qqqm-monitor',
       },
       body: JSON.stringify({
         message: 'chore: update config via dashboard',
