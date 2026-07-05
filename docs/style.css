@@ -297,6 +297,19 @@ tbody td {
 .mini-fill.alert  { background: #fb923c; }
 .mini-fill.danger { background: #f87171; }
 
+/* ── Ticker section header ────────────────────────── */
+.ticker-header {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding-top: 12px;
+  border-top: 1px solid #2d3348;
+}
+.ticker-header.first { border-top: none; padding-top: 0; }
+
 /* ── Nav tabs ─────────────────────────────────────── */
 .page-nav {
   display: flex;

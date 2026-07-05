@@ -219,47 +219,62 @@ const App = {
       el.innerHTML = '<p class="empty">아직 기록이 없습니다. 첫 번째 실행 후 표시됩니다.</p>';
       return;
     }
-    const latest = data[0];
-    const cls  = this.dropClass(latest.drop_pct);
-    const vCls = latest.vix != null ? this.vixClass(latest.vix) : '';
-    const vLbl = latest.vix != null ? this.vixLabel(latest.vix) : '—';
-    const ma50pct  = latest.ma50  != null ? ((latest.current / latest.ma50  - 1) * 100) : null;
-    const ma200pct = latest.ma200 != null ? ((latest.current / latest.ma200 - 1) * 100) : null;
-    const ma50Cls  = ma50pct  != null ? this.maClass(ma50pct)  : '';
-    const ma200Cls = ma200pct != null ? this.maClass(ma200pct) : '';
 
-    el.innerHTML = `
-      <div class="card">
-        <div class="label">현재가</div>
-        <div class="value">$${Number(latest.current).toFixed(2)}</div>
-        <div class="meta">${latest.ticker} · ${latest.date}</div>
-      </div>
-      <div class="card">
-        <div class="label">역대 신고점</div>
-        <div class="value">$${Number(latest.ath).toFixed(2)}</div>
-        <div class="meta">수정주가 기준</div>
-      </div>
-      <div class="card">
-        <div class="label">신고점 대비 하락률</div>
-        <div class="value ${cls}">-${Number(latest.drop_pct).toFixed(2)}%</div>
-        <div class="meta">${latest.alert_sent ? `⚠️ ${latest.alert_sent}% 알림 발송` : '알림 없음'}</div>
-        ${this.renderThresholdBars(latest.drop_pct)}
-      </div>
+    // 종목별 최신 레코드 추출
+    const seen = new Set();
+    const perTicker = [];
+    for (const row of data) {
+      if (!seen.has(row.ticker)) { seen.add(row.ticker); perTicker.push(row); }
+    }
+
+    const vixRow = data[0];
+    const vCls = vixRow.vix != null ? this.vixClass(vixRow.vix) : '';
+    const vLbl = vixRow.vix != null ? this.vixLabel(vixRow.vix) : '—';
+
+    const tickerCards = perTicker.map((row, i) => {
+      const cls      = this.dropClass(row.drop_pct);
+      const ma50pct  = row.ma50  != null ? ((row.current / row.ma50  - 1) * 100) : null;
+      const ma200pct = row.ma200 != null ? ((row.current / row.ma200 - 1) * 100) : null;
+      const ma50Cls  = ma50pct  != null ? this.maClass(ma50pct)  : '';
+      const ma200Cls = ma200pct != null ? this.maClass(ma200pct) : '';
+      return `
+        <div class="ticker-header${i === 0 ? ' first' : ''}">${row.ticker}</div>
+        <div class="card">
+          <div class="label">현재가</div>
+          <div class="value">$${Number(row.current).toFixed(2)}</div>
+          <div class="meta">${row.date}</div>
+        </div>
+        <div class="card">
+          <div class="label">역대 신고점</div>
+          <div class="value">$${Number(row.ath).toFixed(2)}</div>
+          <div class="meta">수정주가 기준</div>
+        </div>
+        <div class="card">
+          <div class="label">신고점 대비 하락률</div>
+          <div class="value ${cls}">-${Number(row.drop_pct).toFixed(2)}%</div>
+          <div class="meta">${row.alert_sent ? `⚠️ ${row.alert_sent}% 알림 발송` : '알림 없음'}</div>
+          ${this.renderThresholdBars(row.drop_pct)}
+        </div>
+        <div class="card">
+          <div class="label">MA50 대비</div>
+          <div class="value ${ma50Cls}">${ma50pct != null ? (ma50pct >= 0 ? '+' : '') + ma50pct.toFixed(2) + '%' : '—'}</div>
+          <div class="meta">${row.ma50 != null ? '$' + Number(row.ma50).toFixed(2) : '데이터 없음'}</div>
+        </div>
+        <div class="card">
+          <div class="label">MA200 대비</div>
+          <div class="value ${ma200Cls}">${ma200pct != null ? (ma200pct >= 0 ? '+' : '') + ma200pct.toFixed(2) + '%' : '—'}</div>
+          <div class="meta">${row.ma200 != null ? '$' + Number(row.ma200).toFixed(2) : '데이터 없음'}</div>
+        </div>
+      `;
+    }).join('');
+
+    el.innerHTML = tickerCards + `
+      <div class="ticker-header">시장 지표</div>
       <div class="card">
         <div class="label">VIX 공포지수</div>
-        <div class="value ${vCls}">${latest.vix != null ? Number(latest.vix).toFixed(1) : '—'}</div>
+        <div class="value ${vCls}">${vixRow.vix != null ? Number(vixRow.vix).toFixed(1) : '—'}</div>
         <div class="meta">${vLbl}</div>
-        ${latest.vix != null ? this.renderVixGauge(latest.vix) : ''}
-      </div>
-      <div class="card">
-        <div class="label">MA50 대비</div>
-        <div class="value ${ma50Cls}">${ma50pct != null ? (ma50pct >= 0 ? '+' : '') + ma50pct.toFixed(2) + '%' : '—'}</div>
-        <div class="meta">${latest.ma50 != null ? `$${Number(latest.ma50).toFixed(2)}` : '데이터 없음'}</div>
-      </div>
-      <div class="card">
-        <div class="label">MA200 대비</div>
-        <div class="value ${ma200Cls}">${ma200pct != null ? (ma200pct >= 0 ? '+' : '') + ma200pct.toFixed(2) + '%' : '—'}</div>
-        <div class="meta">${latest.ma200 != null ? `$${Number(latest.ma200).toFixed(2)}` : '데이터 없음'}</div>
+        ${vixRow.vix != null ? this.renderVixGauge(vixRow.vix) : ''}
       </div>
     `;
   },
